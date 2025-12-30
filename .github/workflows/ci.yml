@@ -18,7 +18,7 @@ jobs:
 
     strategy:
       matrix:
-        go-version: ['1.21', '1.22']
+        go-version: ['1.25.5']
 
     steps:
     - name: Checkout code
@@ -30,6 +30,11 @@ jobs:
         go-version: ${{ matrix.go-version }}
         cache-dependency-path: rigour/go.sum
 
+    - name: Install libpcap-dev
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libpcap-dev
+
     - name: Verify dependencies
       working-directory: ./rigour
       run: |
@@ -38,7 +43,11 @@ jobs:
 
     - name: Run go vet
       working-directory: ./rigour
-      run: go vet ./...
+      run: |
+        # Exclude third_party directory which contains code with testing.T/B calls from goroutines
+        go vet ./cmd/...
+        go vet ./internal/...
+        go vet ./pkg/...
 
     - name: Run go fmt check
       working-directory: ./rigour
@@ -93,6 +102,11 @@ jobs:
       with:
         go-version: '1.22'
         cache-dependency-path: rigour/go.sum
+
+    - name: Install libpcap-dev
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libpcap-dev
 
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v4
