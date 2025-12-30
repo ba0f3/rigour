@@ -1,85 +1,103 @@
-# Rigour: An IoT Scanner Inspired by Shodan.io
+# Rigour: An IoT Search Engine
 
-Rigour is a comprehensive Internet of Things (IoT) scanning tool designed to discover, analyze, and report on devices connected to the internet. By leveraging powerful tools like ZMap and ZGrab, Rigour performs large-scale network scans to identify active hosts, retrieve service banners, and detect potential vulnerabilities. It offers both REST and streaming APIs for data access, and includes a user interface for data visualization.
+[![GitHub License](https://img.shields.io/github/license/ctrlsam/rigour?style=flat-square)](LICENSE)
+[![GitHub Issues](https://img.shields.io/github/issues/ctrlsam/rigour?style=flat-square)](https://github.com/ctrlsam/rigour/issues)
+[![GitHub Stars](https://img.shields.io/github/stars/ctrlsam/rigour?style=flat-square)](https://github.com/ctrlsam/rigour)
+
+Rigour is a comprehensive Internet of Things (IoT) scanning tool designed to discover, analyze, and report on devices connected to the internet. Rigour performs large-scale network scans to identify active hosts, retrieve service banners, and detect potential vulnerabilities. Rigour was inspired by [Shodan.io](https://www.shodan.io/), a popular IoT search engine. If you find this project useful, please consider starring the repository!
+
+> [!WARNING]
+> Rigour is intended for ethical use only. Always obtain permission before scanning networks and devices that you do not own. Use this tool responsibly and in compliance with all applicable laws and regulations.
+
 
 ## Get Started
 
-To quickly set up Rigour and its services, use Docker Compose:
+Before you begin, ensure you have the necessary prerequisites installed on your system.
 
-```bash
-docker compose up
-```
+### Prerequisites
 
-This command initializes all components required for scanning, data processing, and data access.
+* [Docker](https://www.docker.com/get-started)
+* [Docker Compose](https://docs.docker.com/compose/install/)
+* [MaxMind Account](./docs/MAXMIND_SETUP.md)
+
+### Installation Steps
+
+1. **Clone the Repository**:
+
+   ```bash
+   git clone https://github.com/ctrlsam/rigour.git
+   cd rigour
+   ```
+
+### Run with Docker (Recommended)
+
+1. **Configure Environment Variables**:
+   Create a `.env` file under the root directory and set the required environment variables as per the instructions in `.env.example`.
+   You will also want to set what IP range you want to scan. By default this is set as the ENTIRE internet so be careful!
+
+   ```bash
+    cp .env.example .env
+    nano .env
+    ```
+
+2. **Run with Docker Compose**:
+   Ensure you have Docker and Docker Compose installed. Then, run:
+
+   ```bash
+   docker compose up -d
+   ```
+
+3. **Access the UI**:
+    Open your web browser and navigate to `http://localhost:3000` to access the Rigour web interface.
+
+4. **Stop the Services**:
+    To stop the services, run:
+    ```bash
+    docker compose down
+    ```
 
 ## Architecture Overview
-
-![DiagramOverview](./docs/overview_diagram.png)
 
 Rigour's architecture comprises several interconnected components that work in harmony to perform comprehensive network scanning and analysis.
 
 ### Components
 
-#### Port Scanner
+#### Crawler
 
-The **Port Scanner** uses [ZMap](https://github.com/zmap/zmap) to scan specified port ranges and identify active hosts on the internet. Discovered hosts are published to a RabbitMQ queue in the format `{country}.{port}.{ip}.port`. This allows other services to consume live data for further processing. Additionally, scan results are stored in the database for persistent access.
+The Crawler is responsible for performing large-scale network scans using [Naabu](https://github.com/projectdiscovery/naabu) and fingerprinting the discovered devices with [Fingerprintx](https://github.com/praetorian-inc/fingerprintx). Results from this are published to Kafka for further processing. The microservice design was chosen to support multiple worker nodes in the future.
 
-#### Banner Grabber
+#### Persistence
 
-The **Banner Grabber** employs [ZGrab](https://github.com/zmap/zgrab2) to retrieve service banners from the identified hosts, providing detailed information about running services (e.g., SSH, HTTP). This service subscribes to the `{country}.{port}.{ip}.port` queue and publishes the collected banners to `{country}.{port}.{ip}.banners`. The database entries for each host are updated with this new information.
+The Persistence component consumes scan results and enriches them with other data sources such as ASN and location info from GeoIP. It then stores the enriched data in a MongoDB database. This allows for efficient querying and retrieval of scan data for analysis and reporting.
 
-#### Vulnerability Scanner
+#### API
 
-The **Vulnerability Scanner** analyzes the collected banner data to detect vulnerable servers by cross-referencing with CVE databases. It examines identifiers such as HTTP server headers against known vulnerabilities. This service subscribes to the `{country}.{port}.{ip}.banners` queue and publishes its findings to `{country}.{port}.{ip}.vulns`. Host documents in the database are updated with vulnerability details.
+The API component provides a RESTful interface for accessing scan data stored in MongoDB. It serves as the backend for the Rigour UI, enabling users to query and retrieve scan results.
 
-### Data Access Interfaces
+#### User Interface
 
-#### REST API
+The Rigour UI provides an intuitive interface for viewing scan results. You can filter and search for specific devices, view detailed information about each device, and export scan results for further analysis. The app is build using Next.js and communicates with the API to fetch data.
 
-Rigour provides a RESTful API to access the scanned host data programmatically. The API allows for querying hosts, services, and vulnerabilities.
+<img src="./docs/ui.png" alt="Rigour UI Screenshot" width="500"/>
 
-- **Documentation**: Detailed API documentation is available [here](./api/README.md).
+## REST API Documentation
 
-#### Streaming API
+### `GET /api/hosts/search`
 
-For real-time data processing, Rigour offers a streaming API via RabbitMQ queues.
+- **Description**: Search for hosts based on query parameters.
+- **Query Parameters**:
+    - `filter` (optional, string): A JSON-encoded MongoDB-style query object used to filter hosts. The server applies this object directly as a MongoDB $match stage.
+    - `limit` (optional, integer): Maximum number of hosts to return. Defaults to 50. Minimum/invalid values default to 50. Maximum allowed value is 500.
+    - `page_token` (optional, string): Opaque pagination token returned from a previous response next_page_token. Pass this token to retrieve the next page of results.
 
-##### Queue Structure
+### `GET /api/facets`
 
-The RabbitMQ queues follow this naming convention:
+- **Description**: Retrieve available facets for filtering search results.
+- **Query Parameters**:
+    - `filter` (optional, string): A JSON-encoded MongoDB-style query object to restrict the aggregation to a subset of hosts.
 
-```bash
-{country}.{port}.{ip}.{data_type}
-```
+## Acknowledgements
 
-##### Message Components
+We would like to thank the open-source community for their contributions and support in developing Rigour.
 
-- **`{country}`**: Two-letter country code (e.g., `US` for the United States)
-- **`{port}`**: Port number being scanned (e.g., `443`)
-- **`{ip}`**: IP address of the host (e.g., `192.168.1.1`)
-- **`{data_type}`**: Type of data (`port`, `banners`, or `vulns`)
-
-##### Example
-
-```bash
-US.443.192.168.1.1.port
-```
-
-This structure facilitates easy identification and routing of data based on geographic location, port, host, and data type.
-
-### User Interface
-
-A web-based **User Interface** is available for visualizing scan results and interacting with the data.
-
-> **Note**: The user interface is in early development stages and requires manual startup.
-
-## Considerations
-
-1. **Network Capacity**: High scanning rates set in ZMap may consume significant network bandwidth, potentially causing other services to experience latency or connectivity issues.
-2. **Process Resilience**: Current processes do not automatically resume after a crash. If a service like the Banner Grabber fails, it will not pick up where it left off upon restarting. Enhancements to address this limitation are planned for future releases.
-
-## Future Enhancements
-
-- **ISP/Organization Mapping**: Incorporate mapping of IP addresses to Internet Service Providers or organizations to provide more context.
-- **DNS Mapping**: Implement DNS resolution to associate hostnames with IP addresses.
-- **Campaign Configurability**: Introduce configurable scanning campaigns, allowing users to specify ports, protocols, and data types to capture.
+Special thanks to the creators of [Fingerprintx](https://github.com/praetorian-inc/fingerprintx) and [Naabu](https://github.com/projectdiscovery/naabu) for their invaluable tools and resources.

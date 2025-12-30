@@ -1,170 +1,77 @@
 services:
-  port-scanner:
+  crawler:
     build:
-      context: .
-      dockerfile: rigour/ports/Dockerfile
-    restart: unless-stopped
-    network_mode: "host"
-    environment:
-      PORTS: "80,443,22,21,25565,27017,143,6379"
-      NETWORKS: "10.0.0.0/8 192.168.0.0/16"
+      context: ./rigour
+      dockerfile: Dockerfile.crawler
+    container_name: rigour-crawler
     depends_on:
-      rabbitmq:
+      kafka:
         condition: service_healthy
+    command:
+      - "${CRAWLER_CIDR:-0.0.0.0/0}"
+      - "--kafka-brokers"
+      - "kafka:9092"
+      - "--top-ports"
+      - "${CRAWLER_DISCOVERY_TOP_PORTS:-1000}"
+    networks:
+      - rigour-network
+    restart: unless-stopped
 
-  banner-scanner-http-80:
+  persistence:
     build:
-      context: .
-      dockerfile: rigour/banners/Dockerfile
-    restart: unless-stopped
-    network_mode: "host"
-    environment:
-      SERVICE: http
-      PORT: 80
+      context: ./rigour
+      dockerfile: Dockerfile.persistence
+    container_name: rigour-persistence
     depends_on:
-      rabbitmq:
+      kafka:
         condition: service_healthy
-
-  banner-scanner-http-443:
-    build:
-      context: .
-      dockerfile: rigour/banners/Dockerfile
+      mongo:
+        condition: service_started
+      geoipupdate:
+        condition: service_healthy
+    command:
+      - "--brokers"
+      - "kafka:9092"
+      - "--mongo-uri"
+      - "mongodb://mongo:27017"
+      - "--geoip-path"
+      - "/data/geoip"
+    volumes:
+      - geoipupdate_data:/data/geoip
+    networks:
+      - rigour-network
     restart: unless-stopped
-    network_mode: "host"
-    environment:
-      SERVICE: http
-      PORT: 443
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-
-  banner-scanner-ssh-22:
-    build:
-      context: .
-      dockerfile: rigour/banners/Dockerfile
-    restart: unless-stopped
-    network_mode: "host"
-    environment:
-      SERVICE: ssh
-      PORT: 22
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-
-  banner-scanner-ftp-21:
-    build:
-      context: .
-      dockerfile: rigour/banners/Dockerfile
-    restart: unless-stopped
-    network_mode: "host"
-    environment:
-      SERVICE: ftp
-      PORT: 21
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-
-  banner-scanner-imap-143:
-    build:
-      context: .
-      dockerfile: rigour/banners/Dockerfile
-    restart: unless-stopped
-    network_mode: "host"
-    environment:
-      SERVICE: imap
-      PORT: 143
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-
-  banner-scanner-redis-6379:
-    build:
-      context: .
-      dockerfile: rigour/banners/Dockerfile
-    restart: unless-stopped
-    network_mode: "host"
-    environment:
-      SERVICE: redis
-      PORT: 6379
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-
-  banner-scanner-mongodb-27017:
-    build:
-      context: .
-      dockerfile: rigour/banners/Dockerfile
-    restart: unless-stopped
-    network_mode: "host"
-    environment:
-      SERVICE: mongodb
-      PORT: 27017
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-
-  banner-scanner-jarm-443:
-    build:
-      context: .
-      dockerfile: rigour/banners/Dockerfile
-    restart: unless-stopped
-    network_mode: "host"
-    environment:
-      SERVICE: jarm
-      PORT: 443
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-
-  addon-minecraft-scanner:
-    build:
-      context: .
-      dockerfile: rigour/addons/minecraft/Dockerfile
-    restart: unless-stopped
-    network_mode: "host"
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-
-  vuln-scanner:
-    build:
-      context: .
-      dockerfile: rigour/vuln/Dockerfile
-    restart: unless-stopped
-    network_mode: "host"
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
 
   api:
     build:
-      context: .
-      dockerfile: rigour/api/Dockerfile
-    restart: unless-stopped
-    network_mode: "host"
+      context: ./rigour
+      dockerfile: Dockerfile.api
+    container_name: rigour-api
+    ports:
+      - "8080:8080"
+    command:
+      - "--mongo-uri"
+      - "mongodb://mongo:27017"
     depends_on:
-      rabbitmq:
-        condition: service_healthy
-
-  mongodb:
-    image: mongo
-    restart: always
-    ports:
-      - "27017:27017"
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  rabbitmq:
-    image: rabbitmq:3-management
+      - mongo
+    networks:
+      - rigour-network
     restart: unless-stopped
+
+  ui:
+    build:
+      context: ./rigour-ui
+    container_name: rigour-ui
+    depends_on:
+     - api
     ports:
-      - "5672:5672"
-      - "15672:15672"
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://api:8080
+    networks:
+      - rigour-network
+    restart: unless-stopped
+
+networks:
+  rigour-network:
+    driver: bridge
