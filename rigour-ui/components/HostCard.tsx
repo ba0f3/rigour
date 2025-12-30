@@ -14,7 +14,7 @@ export function HostCard({ host, onClick }: HostCardProps) {
   };
 
   return (
-    <Card 
+    <Card
       className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer"
     >
       <CardHeader className="pb-3">

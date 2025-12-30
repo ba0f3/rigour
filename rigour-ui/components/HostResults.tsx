@@ -36,7 +36,7 @@ export function HostResults({ hosts, totalCount, isLoading }: HostResultsProps) 
   const getPageNumbers = () => {
     const pages: (number | string)[] = [];
     const showPages = 5;
-    
+
     if (totalPages <= showPages) {
       for (let i = 1; i <= totalPages; i++) {
         pages.push(i);
@@ -64,7 +64,7 @@ export function HostResults({ hosts, totalCount, isLoading }: HostResultsProps) 
         pages.push(totalPages);
       }
     }
-    
+
     return pages;
   };
 

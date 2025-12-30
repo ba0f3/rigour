@@ -2,6 +2,18 @@ import { Host } from './types';
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
 
+export interface CountryFacet {
+  code: string;
+  name: string;
+  count: number;
+}
+
+export interface ASNFacet {
+  code: number;
+  name: string;
+  count: number;
+}
+
 export interface SearchResponse {
   hosts: Host[];
   facets?: FacetCounts;
@@ -9,9 +21,9 @@ export interface SearchResponse {
 }
 
 export interface FacetCounts {
-  services?: Record<string, number>;
-  countries?: Record<string, number>;
-  asns?: Record<string, number>;
+  services: Record<string, number>;
+  countries: CountryFacet[];
+  asns: ASNFacet[];
 }
 
 export interface FacetsResponse {
@@ -27,21 +39,21 @@ export async function searchHosts(
   pageToken?: string
 ): Promise<SearchResponse> {
   const params = new URLSearchParams();
-  
+
   if (filter && Object.keys(filter).length > 0) {
     params.append('filter', JSON.stringify(filter));
   }
-  
+
   if (limit) {
     params.append('limit', limit.toString());
   }
-  
+
   if (pageToken) {
     params.append('page_token', pageToken);
   }
 
   const url = `${API_BASE_URL}/api/hosts/search?${params.toString()}`;
-  
+
   const response = await fetch(url, {
     method: 'GET',
     headers: {
@@ -63,13 +75,13 @@ export async function getFacets(
   filter?: Record<string, any>
 ): Promise<FacetsResponse> {
   const params = new URLSearchParams();
-  
+
   if (filter && Object.keys(filter).length > 0) {
     params.append('filter', JSON.stringify(filter));
   }
 
   const url = `${API_BASE_URL}/api/facets?${params.toString()}`;
-  
+
   const response = await fetch(url, {
     method: 'GET',
     headers: {
@@ -89,7 +101,7 @@ export async function getFacets(
  */
 export async function getHostByIP(ip: string): Promise<Host> {
   const url = `${API_BASE_URL}/api/hosts/${ip}`;
-  
+
   const response = await fetch(url, {
     method: 'GET',
     headers: {

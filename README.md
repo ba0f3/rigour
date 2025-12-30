@@ -6,7 +6,7 @@
 
 Rigour is a comprehensive Internet of Things (IoT) scanning tool designed to discover, analyze, and report on devices connected to the internet. Rigour performs large-scale network scans to identify active hosts, retrieve service banners, and detect potential vulnerabilities. Rigour was inspired by [Shodan.io](https://www.shodan.io/), a popular IoT search engine. If you find this project useful, please consider starring the repository!
 
-> [!WARNING]  
+> [!WARNING]
 > Rigour is intended for ethical use only. Always obtain permission before scanning networks and devices that you do not own. Use this tool responsibly and in compliance with all applicable laws and regulations.
 
 
@@ -16,7 +16,7 @@ Before you begin, ensure you have the necessary prerequisites installed on your 
 
 ### Prerequisites
 
-* [Docker](https://www.docker.com/get-started) 
+* [Docker](https://www.docker.com/get-started)
 * [Docker Compose](https://docs.docker.com/compose/install/)
 * [MaxMind Account](./docs/MAXMIND_SETUP.md)
 
@@ -29,7 +29,9 @@ Before you begin, ensure you have the necessary prerequisites installed on your 
    cd rigour
    ```
 
-2. **Configure Environment Variables**:
+### Run with Docker (Recommended)
+
+1. **Configure Environment Variables**:
    Create a `.env` file under the root directory and set the required environment variables as per the instructions in `.env.example`.
    You will also want to set what IP range you want to scan. By default this is set as the ENTIRE internet so be careful!
 
@@ -66,7 +68,7 @@ The Crawler is responsible for performing large-scale network scans using [Naabu
 
 #### Persistence
 
-The Persistence component consumes scan results from Kafka and stores them in a MongoDB database. This allows for efficient querying and retrieval of scan data for analysis and reporting.
+The Persistence component consumes scan results and enriches them with other data sources such as ASN and location info from GeoIP. It then stores the enriched data in a MongoDB database. This allows for efficient querying and retrieval of scan data for analysis and reporting.
 
 #### API
 

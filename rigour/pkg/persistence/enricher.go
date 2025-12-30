@@ -4,30 +4,57 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"time"
 
-	"github.com/ctrlsam/rigour/internal/geoip"
 	"github.com/ctrlsam/rigour/pkg/types"
 )
 
 type Enricher struct {
-	geoipClient *geoip.Client
+	geoIPReaders *GeoIPReaders
 }
 
-func NewEnricher(geoipClient *geoip.Client) *Enricher {
+func NewEnricher(geoIPReaders *GeoIPReaders) *Enricher {
 	return &Enricher{
-		geoipClient: geoipClient,
+		geoIPReaders: geoIPReaders,
 	}
 }
 
 func (enricher *Enricher) EnrichHost(ctx context.Context, host *types.Host) (*types.Host, error) {
-	// Lookup GeoIP and ASN information
-	lookupCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	geo, err := enricher.geoipClient.Lookup(lookupCtx, host.IP)
-	cancel()
+	ip := net.ParseIP(host.IP)
+	if ip == nil {
+		return nil, fmt.Errorf("invalid IP address: %s", host.IP)
+	}
 
-	if err != nil {
-		return nil, err
+	// Lookup ASN
+	if enricher.geoIPReaders.ASN != nil {
+		if record, err := enricher.geoIPReaders.ASN.ASN(ip); err == nil {
+			if host.ASN == nil {
+				host.ASN = &types.ASNInfo{}
+			}
+			host.ASN.Number = uint32(record.AutonomousSystemNumber)
+			host.ASN.Organization = record.AutonomousSystemOrganization
+		}
+	}
+
+	// Lookup GeoIP City
+	if enricher.geoIPReaders.City != nil {
+		if record, err := enricher.geoIPReaders.City.City(ip); err == nil {
+			host.Location = &types.Location{
+				Coordinates: [2]float64{record.Location.Longitude, record.Location.Latitude},
+				City:        record.City.Names["en"],
+				Timezone:    record.Location.TimeZone,
+				CountryCode: record.Country.IsoCode,
+				CountryName: record.Country.Names["en"],
+			}
+
+			// Add Satellite Provider label
+			host.ASN.IsSatelliteProvider = record.Traits.IsSatelliteProvider
+
+			// Add labels
+			if record.Traits.IsAnonymousProxy {
+				host.Labels = append(host.Labels, "anonymous-proxy")
+			}
+
+		}
 	}
 
 	// Populate IP integer representation
@@ -36,25 +63,6 @@ func (enricher *Enricher) EnrichHost(ctx context.Context, host *types.Host) (*ty
 		return nil, err
 	}
 	host.IPInt = ipInt
-
-	// Populate location info
-	host.Location = &types.Location{
-		Coordinates: [2]float64{geo.Longitude, geo.Latitude},
-		City:        geo.City,
-		Timezone:    geo.Timezone,
-	}
-
-	// Populate ASN info
-	host.ASN = &types.ASNInfo{
-		Number:       uint32(geo.ASN),
-		Organization: geo.Organization,
-		Country:      geo.Country,
-	}
-
-	// Add labels based on GeoIP flags
-	if geo.IsAnonymousProxy {
-		host.Labels = append(host.Labels, "anonymous_proxy")
-	}
 
 	return host, nil
 }
@@ -75,4 +83,11 @@ func (enricher *Enricher) IpToIPInt(ip string) (uint64, error) {
 	// Convert 4 bytes to uint64
 	// Each byte is shifted to its appropriate position
 	return uint64(ipv4[0])<<24 | uint64(ipv4[1])<<16 | uint64(ipv4[2])<<8 | uint64(ipv4[3]), nil
+}
+
+// Close closes the GeoIP database readers.
+func (enricher *Enricher) Close() {
+	if enricher.geoIPReaders != nil {
+		enricher.geoIPReaders.Close()
+	}
 }

@@ -11,9 +11,9 @@ interface PageProps {
 
 export default async function Home({ searchParams: searchParamsPromise }: PageProps) {
   const searchParams = await searchParamsPromise;
-  
+
   let hosts: Host[] = [];
-  let facets: FacetCounts = {};
+  let facets: FacetCounts | undefined = undefined;
   let error: string | null = null;
 
   try {
@@ -55,7 +55,7 @@ export default async function Home({ searchParams: searchParamsPromise }: PagePr
       const filterParams = Array.isArray(searchParams.filter)
         ? searchParams.filter
         : [searchParams.filter];
-      
+
       for (const filterParam of filterParams) {
         try {
           const parsedFilter = JSON.parse(filterParam);
@@ -78,16 +78,6 @@ export default async function Home({ searchParams: searchParamsPromise }: PagePr
     console.error('Failed to fetch data:', err);
     error = err instanceof Error ? err.message : 'Failed to fetch data';
   }
-
-  // Extract unique values for filters from facets
-  const countries = Object.keys(facets.countries || {}).sort();
-  const asns = Object.keys(facets.asns || {})
-    .map(asnStr => {
-      const parts = asnStr.split('-');
-      return `AS${parts[0]}`;
-    })
-    .sort();
-  const allServices = Object.keys(facets.services || {}).sort();
 
   // World Map dots data
   const mapDots = hosts
@@ -121,7 +111,7 @@ export default async function Home({ searchParams: searchParamsPromise }: PagePr
   return (
     <div className="dark min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
-        <SearchHeader 
+        <SearchHeader
           initialQuery={
             typeof searchParams.query === 'string' ? searchParams.query : ''
           }
@@ -129,10 +119,9 @@ export default async function Home({ searchParams: searchParamsPromise }: PagePr
 
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-5 gap-6">
           <aside className="lg:col-span-1">
+            {facets && (
             <FacetFilters
-              countries={countries}
-              asns={asns}
-              services={allServices}
+              facets={facets}
               selectedCountries={
                 Array.isArray(searchParams.countries)
                   ? searchParams.countries
@@ -148,8 +137,8 @@ export default async function Home({ searchParams: searchParamsPromise }: PagePr
                   ? searchParams.services
                   : searchParams.services?.split(',') || []
               }
-              facets={facets}
             />
+            )}
           </aside>
 
           <main className="lg:col-span-4 space-y-6">

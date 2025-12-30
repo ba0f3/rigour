@@ -14,14 +14,13 @@ import (
 )
 
 type cliConfig struct {
-	brokers    string
-	groupID    string
-	topic      string
-	mongoURI   string
-	database   string
-	collection string
-	geoipURL   string
-	geoipKey   string
+	brokers       string
+	groupID       string
+	topic         string
+	dbURI         string
+	dbName        string
+	dbCollection  string
+	geoipDataPath string
 }
 
 func main() {
@@ -32,15 +31,14 @@ func main() {
 		Short: "Consume crawler service events and persist/enrich hosts in MongoDB",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			appCfg := persistence.Config{
-				KafkaBrokers:    cfg.brokers,
-				KafkaGroupID:    cfg.groupID,
-				Topic:           cfg.topic,
-				MongoURI:        cfg.mongoURI,
-				MongoDatabase:   cfg.database,
-				MongoCollection: cfg.collection,
-				MongoTimeout:    10 * time.Second,
-				GeoIPBaseURL:    cfg.geoipURL,
-				GeoIPAPIKey:     cfg.geoipKey,
+				KafkaBrokers: cfg.brokers,
+				KafkaGroupID: cfg.groupID,
+				Topic:        cfg.topic,
+				DbURI:        cfg.dbURI,
+				DbName:       cfg.dbName,
+				DbCollection: cfg.dbCollection,
+				DbTimeout:    10 * time.Second,
+				GeoIPDataDir: cfg.geoipDataPath,
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -72,12 +70,11 @@ func main() {
 	root.Flags().StringVar(&cfg.groupID, "group", "rigour-persistence", "Kafka consumer group id")
 	root.Flags().StringVar(&cfg.topic, "topic", internalconst.KafkaTopicScannedServices, "Kafka topic to consume")
 
-	root.Flags().StringVar(&cfg.mongoURI, "mongo-uri", "mongodb://localhost:27017", "MongoDB connection URI")
-	root.Flags().StringVar(&cfg.database, "mongo-db", internalconst.DatabaseName, "MongoDB database name")
-	root.Flags().StringVar(&cfg.collection, "mongo-coll", internalconst.HostsRepositoryName, "MongoDB hosts collection name")
+	root.Flags().StringVar(&cfg.dbURI, "mongo-uri", "mongodb://localhost:27017", "MongoDB connection URI")
+	root.Flags().StringVar(&cfg.dbName, "mongo-db", internalconst.DatabaseName, "MongoDB database name")
+	root.Flags().StringVar(&cfg.dbCollection, "mongo-coll", internalconst.HostsRepositoryName, "MongoDB hosts collection name")
 
-	root.Flags().StringVar(&cfg.geoipURL, "geoip-url", "http://localhost:5000", "GoGeoIP base URL")
-	root.Flags().StringVar(&cfg.geoipKey, "geoip-key", "mykey", "GoGeoIP api key")
+	root.Flags().StringVar(&cfg.geoipDataPath, "geoip-path", "", "Path to GeoIP data directory containing GeoLite2 database files")
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

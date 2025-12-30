@@ -1,6 +1,13 @@
 package api
 
-import "github.com/ctrlsam/rigour/pkg/types"
+import (
+	"github.com/ctrlsam/rigour/internal/storage"
+	"github.com/ctrlsam/rigour/pkg/types"
+)
+
+// Alias storage facet types for API usage
+type CountryFacet = storage.CountryFacet
+type ASNFacet = storage.ASNFacet
 
 // SearchRequest represents a search query request.
 type SearchRequest struct {
@@ -19,8 +26,8 @@ type SearchResponse struct {
 // FacetCounts represents aggregated counts for various facets.
 type FacetCounts struct {
 	Services  map[string]int `json:"services,omitempty"`
-	Countries map[string]int `json:"countries,omitempty"`
-	ASNs      map[string]int `json:"asns,omitempty"`
+	Countries []CountryFacet `json:"countries,omitempty"`
+	ASNs      []ASNFacet     `json:"asns,omitempty"`
 }
 
 // FacetRequest represents a request for facet aggregation.

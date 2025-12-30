@@ -1,9 +1,6 @@
-"use client";
-
-import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { getHostByIP } from '../../../../lib/api';
+import { formatDate, formatDateShort } from '../../../../lib/utils';
 import { Host } from '../../../../lib/types';
 import { Card, CardContent, CardHeader } from '../../../../components/ui/card';
 import { Badge } from '../../../../components/ui/badge';
@@ -20,76 +17,26 @@ import {
   CheckCircle,
   Wifi,
   Shield,
-  Copy,
-  Check,
 } from 'lucide-react';
 
-export default function HostDetailsPage() {
-  const params = useParams();
-  const slug = params?.slug as string;
-  
-  const [host, setHost] = useState<Host | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
+interface Params {
+  slug: string;
+}
 
-  useEffect(() => {
-    const fetchHost = async () => {
-      if (!slug) return;
-      
-      setLoading(true);
-      setError(null);
-      
-      try {
-        const data = await getHostByIP(slug);
-        setHost(data);
-      } catch (err) {
-        console.error('Failed to fetch host:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch host details');
-      } finally {
-        setLoading(false);
-      }
-    };
+export default async function HostDetailsPage({ 
+  params 
+}: { 
+  params: Promise<Params> 
+}) {
+  const { slug } = await params;
+  let host: Host | null = null;
+  let error: string | null = null;
 
-    fetchHost();
-  }, [slug]);
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
-  };
-
-  const formatDateShort = (dateString: string) => {
-    return new Date(dateString).toISOString().split('T')[0];
-  };
-
-  const copyToClipboard = async (text: string, id: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(id);
-      setTimeout(() => setCopied(null), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background p-6 dark">
-        <div className="max-w-6xl mx-auto">
-          <div className="space-y-6">
-            <Link href="/">
-              <Button size="sm" className="gap-2">
-                <ChevronLeft className="h-4 w-4" />
-                Back to Search
-              </Button>
-            </Link>
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">Loading host details...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  try {
+    host = await getHostByIP(slug);
+  } catch (err) {
+    console.error('Failed to fetch host:', err);
+    error = err instanceof Error ? err.message : 'Failed to fetch host details';
   }
 
   if (error || !host) {
@@ -98,7 +45,7 @@ export default function HostDetailsPage() {
         <div className="max-w-6xl mx-auto">
           <div className="space-y-6">
             <Link href="/">
-              <Button size="sm" className="gap-2">
+              <Button size="sm" variant="outline" className="gap-2">
                 <ChevronLeft className="h-4 w-4" />
                 Back to Search
               </Button>
@@ -121,7 +68,7 @@ export default function HostDetailsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <Link href="/">
-            <Button size="sm" className="gap-2">
+            <Button size="sm" variant="outline" className="gap-2">
               <ChevronLeft className="h-4 w-4" />
               Back to Search
             </Button>
@@ -142,24 +89,6 @@ export default function HostDetailsPage() {
                   </h1>
                   <p className="text-lg text-muted-foreground">{host.asn.organization}</p>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => copyToClipboard(host.ip, 'ip')}
-                  className="gap-2"
-                >
-                  {copied === 'ip' ? (
-                    <>
-                      <Check className="h-4 w-4" />
-                      Copied
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4" />
-                      Copy IP
-                    </>
-                  )}
-                </Button>
               </div>
 
               {/* Key Information Grid */}
@@ -359,7 +288,7 @@ export default function HostDetailsPage() {
                                       ([key, values]) => (
                                         <p key={key}>
                                           <span className="text-blue-400">{key}:</span>{' '}
-                                          {values.join(', ')}
+                                          {(values as string[]).join(', ')}
                                         </p>
                                       )
                                     )}
@@ -395,7 +324,7 @@ export default function HostDetailsPage() {
                                       ([key, values]) => (
                                         <p key={key}>
                                           <span className="text-blue-400">{key}:</span>{' '}
-                                          {values.join(', ')}
+                                          {(values as string[]).join(', ')}
                                         </p>
                                       )
                                     )}

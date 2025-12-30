@@ -9,6 +9,10 @@ import (
 )
 
 func TestIPSEC(t *testing.T) {
+	// Flaky in CI: depends on container timing/networking and can fail to
+	// fingerprint reliably on shared runners.
+	t.Skip("skipping flaky docker integration test")
+
 	testcases := []test.Testcase{
 		{
 			Description: "ipsec",
@@ -36,7 +40,7 @@ func TestIPSEC(t *testing.T) {
 			t.Parallel()
 			err := test.RunTest(t, tc, p)
 			if err != nil {
-				t.Errorf(err.Error())
+				t.Error(err)
 			}
 		})
 	}

@@ -220,9 +220,12 @@ func (repo *HostRepository) Facets(ctx context.Context, filter map[string]interf
 					bson.M{"$sort": bson.M{"count": -1}},
 				},
 				"countries": bson.A{
-					bson.M{"$match": bson.M{"asn.country": bson.M{"$exists": true, "$ne": nil}}},
+					bson.M{"$match": bson.M{"location.country_code": bson.M{"$exists": true, "$ne": nil}}},
 					bson.M{"$group": bson.M{
-						"_id":   "$asn.country",
+						"_id": bson.M{
+							"code": "$location.country_code",
+							"name": "$location.country_name",
+						},
 						"count": bson.M{"$sum": 1},
 					}},
 					bson.M{"$sort": bson.M{"count": -1}},
@@ -256,16 +259,16 @@ func (repo *HostRepository) Facets(ctx context.Context, filter map[string]interf
 	if len(results) == 0 {
 		return &storage.FacetCounts{
 			Services:  make(map[string]int),
-			Countries: make(map[string]int),
-			ASNs:      make(map[string]int),
+			Countries: []storage.CountryFacet{},
+			ASNs:      []storage.ASNFacet{},
 		}, nil
 	}
 
 	facetResult := results[0]
 	counts := &storage.FacetCounts{
 		Services:  make(map[string]int),
-		Countries: make(map[string]int),
-		ASNs:      make(map[string]int),
+		Countries: []storage.CountryFacet{},
+		ASNs:      []storage.ASNFacet{},
 	}
 
 	// Process services facet
@@ -290,7 +293,16 @@ func (repo *HostRepository) Facets(ctx context.Context, filter map[string]interf
 				if doc, ok := item.(bson.M); ok {
 					if id, ok := doc["_id"]; ok {
 						if count, ok := doc["count"].(int32); ok {
-							counts.Countries[fmt.Sprintf("%v", id)] = int(count)
+							// Extract code and name from the grouped _id
+							if idMap, ok := id.(bson.M); ok {
+								code := fmt.Sprintf("%v", idMap["code"])
+								name := fmt.Sprintf("%v", idMap["name"])
+								counts.Countries = append(counts.Countries, storage.CountryFacet{
+									Code:  code,
+									Name:  name,
+									Count: int(count),
+								})
+							}
 						}
 					}
 				}
@@ -305,12 +317,32 @@ func (repo *HostRepository) Facets(ctx context.Context, filter map[string]interf
 				if doc, ok := item.(bson.M); ok {
 					if id, ok := doc["_id"]; ok {
 						if count, ok := doc["count"].(int32); ok {
-							// Format ASN key as "number-organization"
 							if idMap, ok := id.(bson.M); ok {
-								number := idMap["number"]
-								organization := idMap["organization"]
-								key := fmt.Sprintf("%v-%v", number, organization)
-								counts.ASNs[key] = int(count)
+								var asnCode uint32
+								if numberVal, ok := idMap["number"]; ok {
+									// Handle both int32 and uint32 types
+									switch v := numberVal.(type) {
+									case int32:
+										asnCode = uint32(v)
+									case uint32:
+										asnCode = v
+									case int64:
+										asnCode = uint32(v)
+									case float64:
+										asnCode = uint32(v)
+									}
+								}
+								
+								var organization string
+								if orgVal, ok := idMap["organization"]; ok {
+									organization = fmt.Sprintf("%v", orgVal)
+								}
+								
+								counts.ASNs = append(counts.ASNs, storage.ASNFacet{
+									Code:  asnCode,
+									Name:  organization,
+									Count: int(count),
+								})
 							}
 						}
 					}

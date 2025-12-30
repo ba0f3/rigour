@@ -27,17 +27,17 @@ services:
         condition: service_healthy
       mongo:
         condition: service_started
-      # go-geo-ip:
-      #   condition: service_started
+      geoipupdate:
+        condition: service_healthy
     command:
       - "--brokers"
       - "kafka:9092"
       - "--mongo-uri"
       - "mongodb://mongo:27017"
-      - "--geoip-url"
-      - "http://go-geo-ip:5000"
-      - "--geoip-key"
-      - "${MAXMIND_LICENSE_KEY:-mykey}"
+      - "--geoip-path"
+      - "/data/geoip"
+    volumes:
+      - geoipupdate_data:/data/geoip
     networks:
       - rigour-network
     restart: unless-stopped

@@ -11,23 +11,17 @@ import { useRouter } from 'next/navigation';
 import { FacetCounts } from '../lib/api';
 
 interface FacetFiltersProps {
-  countries: string[];
-  asns: string[];
-  services: string[];
+  facets: FacetCounts;
   selectedCountries: string[];
   selectedASNs: string[];
   selectedServices: string[];
-  facets: FacetCounts;
 }
 
 export function FacetFilters({
-  countries,
-  asns,
-  services,
+  facets,
   selectedCountries: initialCountries,
   selectedASNs: initialASNs,
   selectedServices: initialServices,
-  facets,
 }: FacetFiltersProps) {
   const [expandedSections, setExpandedSections] = useState({
     countries: true,
@@ -38,7 +32,7 @@ export function FacetFilters({
   const [tempCountries, setTempCountries] = useState(initialCountries);
   const [tempASNs, setTempASNs] = useState(initialASNs);
   const [tempServices, setTempServices] = useState(initialServices);
-  
+
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -52,19 +46,19 @@ export function FacetFilters({
   const applyFilters = () => {
     startTransition(() => {
       const params = new URLSearchParams();
-      
+
       if (tempCountries.length > 0) {
         params.append('countries', tempCountries.join(','));
       }
-      
+
       if (tempASNs.length > 0) {
         params.append('asns', tempASNs.join(','));
       }
-      
+
       if (tempServices.length > 0) {
         params.append('services', tempServices.join(','));
       }
-      
+
       router.push(`?${params.toString()}`);
     });
   };
@@ -99,20 +93,6 @@ export function FacetFilters({
     JSON.stringify(tempASNs) !== JSON.stringify(initialASNs) ||
     JSON.stringify(tempServices) !== JSON.stringify(initialServices);
 
-  const getCountryCount = (country: string) =>
-    facets.countries?.[country] || 0;
-
-  const getASNCount = (asn: string) => {
-    const asnNum = asn.replace('AS', '');
-    const key = Object.keys(facets.asns || {}).find(k =>
-      k.startsWith(asnNum + '-')
-    );
-    return key ? facets.asns![key] : 0;
-  };
-
-  const getServiceCount = (service: string) =>
-    facets.services?.[service] || 0;
-
   return (
     <div className="space-y-4 relative">
       {isPending && (
@@ -135,26 +115,28 @@ export function FacetFilters({
           </CardTitle>
         </CardHeader>
         {expandedSections.countries && (
-          <CardContent>
+          <CardContent className="p-0">
             <ScrollArea className="h-48">
-              <div className="space-y-3">
-                {countries.map((country) => (
-                  <div key={country} className="flex items-center justify-between space-x-2">
-                    <div className="flex items-center space-x-2">
+              <div className="space-y-3 px-4 py-2">
+                {facets.countries.map((country) => (
+                  <div key={country.code} className="flex items-center justify-between gap-2 pr-4">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
                       <Checkbox
-                        id={`country-${country}`}
-                        checked={tempCountries.includes(country)}
-                        onCheckedChange={() => handleCountryToggle(country)}
+                        id={`country-${country.code}`}
+                        checked={tempCountries.includes(country.code)}
+                        onCheckedChange={() => handleCountryToggle(country.code)}
+                        className="flex-shrink-0"
                       />
                       <Label
-                        htmlFor={`country-${country}`}
+                        htmlFor={`country-${country.code}`}
                         className="cursor-pointer text-sm font-normal"
+                        title={country.name}
                       >
-                        {country}
+                        {country.name}
                       </Label>
                     </div>
-                    <span className="text-xs text-muted-foreground font-mono">
-                      {getCountryCount(country)}
+                    <span className="text-xs text-muted-foreground font-mono flex-shrink-0 whitespace-nowrap">
+                      {country.count}
                     </span>
                   </div>
                 ))}
@@ -176,29 +158,34 @@ export function FacetFilters({
           </CardTitle>
         </CardHeader>
         {expandedSections.asns && (
-          <CardContent>
+          <CardContent className="p-0">
             <ScrollArea className="h-48">
-              <div className="space-y-3">
-                {asns.map((asn) => (
-                  <div key={asn} className="flex items-center justify-between space-x-2">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`asn-${asn}`}
-                        checked={tempASNs.includes(asn)}
-                        onCheckedChange={() => handleASNToggle(asn)}
-                      />
-                      <Label
-                        htmlFor={`asn-${asn}`}
-                        className="cursor-pointer text-sm font-normal font-mono"
-                      >
-                        {asn}
-                      </Label>
+              <div className="space-y-3 px-4 py-2">
+                {facets.asns.map((asn) => {
+                  const asnString = `AS${asn.code}`;
+                  return (
+                    <div key={asn.code} className="flex items-center justify-between gap-2 pr-4">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Checkbox
+                          id={`asn-${asnString}`}
+                          checked={tempASNs.includes(asnString)}
+                          onCheckedChange={() => handleASNToggle(asnString)}
+                          className="flex-shrink-0"
+                        />
+                        <Label
+                          htmlFor={`asn-${asnString}`}
+                          className="cursor-pointer text-sm font-normal w-24"
+                          title={asn.name}
+                        >
+                          {asn.name}
+                        </Label>
+                      </div>
+                      <span className="text-xs text-muted-foreground font-mono flex-shrink-0 whitespace-nowrap">
+                        {asn.count}
+                      </span>
                     </div>
-                    <span className="text-xs text-muted-foreground font-mono">
-                      {getASNCount(asn)}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </ScrollArea>
           </CardContent>
@@ -217,26 +204,28 @@ export function FacetFilters({
           </CardTitle>
         </CardHeader>
         {expandedSections.services && (
-          <CardContent>
+          <CardContent className="p-0">
             <ScrollArea className="h-48">
-              <div className="space-y-3">
-                {services.map((service) => (
-                  <div key={service} className="flex items-center justify-between space-x-2">
-                    <div className="flex items-center space-x-2">
+              <div className="space-y-3 px-4 py-2">
+                {Object.entries(facets.services || {}).map(([service, count]) => (
+                  <div key={service} className="flex items-center justify-between gap-2 pr-4">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
                       <Checkbox
                         id={`service-${service}`}
                         checked={tempServices.includes(service)}
                         onCheckedChange={() => handleServiceToggle(service)}
+                        className="flex-shrink-0"
                       />
                       <Label
                         htmlFor={`service-${service}`}
                         className="cursor-pointer text-sm font-normal uppercase"
+                        title={service}
                       >
                         {service}
                       </Label>
                     </div>
-                    <span className="text-xs text-muted-foreground font-mono">
-                      {getServiceCount(service)}
+                    <span className="text-xs text-muted-foreground font-mono flex-shrink-0 whitespace-nowrap">
+                      {count}
                     </span>
                   </div>
                 ))}

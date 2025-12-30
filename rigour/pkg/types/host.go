@@ -17,14 +17,15 @@ type Host struct {
 }
 
 type Location struct {
-	Coordinates [2]float64 `json:"coordinates"`        // [longitude, latitude]
-	City        string     `json:"city,omitempty"`     // City name
-	Timezone    string     `json:"timezone,omitempty"` // IANA timezone identifier
+	Coordinates [2]float64 `json:"coordinates"`                                          // [longitude, latitude]
+	City        string     `json:"city,omitempty"`                                       // City name
+	Timezone    string     `json:"timezone,omitempty"`                                   // IANA timezone identifier
+	CountryCode string     `json:"country_code,omitempty" bson:"country_code,omitempty"` // ISO 3166-1 alpha-2 country code
+	CountryName string     `json:"country_name,omitempty" bson:"country_name,omitempty"` // Country name
 }
 
 type ASNInfo struct {
 	Number              uint32 `json:"number"`                                                       // ASN number
 	Organization        string `json:"organization,omitempty"`                                       // ISP/Organization name
-	Country             string `json:"country,omitempty"`                                            // Country code (ISO 3166-1 alpha-2)
 	IsSatelliteProvider bool   `json:"is_satellite_provider,omitempty" bson:"is_satellite_provider"` // Whether the ASN is a satellite internet provider
 }

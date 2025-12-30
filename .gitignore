@@ -29,3 +29,5 @@ rigour/rigour
 
 # env
 .env
+
+/data

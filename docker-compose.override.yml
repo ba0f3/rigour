@@ -51,23 +51,6 @@ services:
   #     - rigour-network
 
   # ============================================
-  # GoGeoIP (GeoIP Database)
-  # ============================================
-
-  # go-geo-ip:
-  #   image: hibare/go-geo-ip:latest
-  #   container_name: go-geo-ip
-  #   ports:
-  #     - "5000:5000"
-  #   environment:
-  #     DB_LICENSE_KEY: ${MAXMIND_LICENSE_KEY}
-  #     API_KEYS: mykey
-  #   volumes:
-  #     - geoip-data:/data
-  #   networks:
-  #     - rigour-network
-
-  # ============================================
   # MongoDB
   # ============================================
 
@@ -81,6 +64,22 @@ services:
     networks:
       - rigour-network
 
+  # ============================================
+  # GeoIP Data Puller
+  # ============================================
+
+  geoipupdate:
+    container_name: geoipupdate
+    image: ghcr.io/maxmind/geoipupdate
+    restart: unless-stopped
+    environment:
+      - GEOIPUPDATE_ACCOUNT_ID=${MAXMIND_ACCOUNT_ID}
+      - GEOIPUPDATE_LICENSE_KEY=${MAXMIND_LICENSE_KEY}
+      - 'GEOIPUPDATE_EDITION_IDS=GeoLite2-ASN GeoLite2-City'
+      - GEOIPUPDATE_FREQUENCY=72
+    volumes:
+      - 'geoipupdate_data:/usr/share/GeoIP'
+
 volumes:
   mongo-data:
-  geoip-data:
+  geoipupdate_data:

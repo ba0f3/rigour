@@ -33,7 +33,7 @@ func TestNetBIOS(t *testing.T) {
 			t.Parallel()
 			err := test.RunTest(t, tc, p)
 			if err != nil {
-				t.Errorf(err.Error())
+				t.Error(err)
 			}
 		})
 	}

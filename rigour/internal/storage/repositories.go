@@ -15,11 +15,25 @@ type RepositoryConfig struct {
 	Timeout    int // in seconds
 }
 
+// CountryFacet represents a country facet with code and name.
+type CountryFacet struct {
+	Code  string `json:"code"`
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+// ASNFacet represents an ASN facet with code, name, and count.
+type ASNFacet struct {
+	Code  uint32 `json:"code"`
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
 // FacetCounts represents aggregated counts for various facets.
 type FacetCounts struct {
 	Services  map[string]int `json:"services,omitempty"`
-	Countries map[string]int `json:"countries,omitempty"`
-	ASNs      map[string]int `json:"asns,omitempty"`
+	Countries []CountryFacet `json:"countries,omitempty"`
+	ASNs      []ASNFacet     `json:"asns,omitempty"`
 }
 
 // HostRepository is the interface for storing and querying host records.
