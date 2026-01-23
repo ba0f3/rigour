@@ -21,14 +21,14 @@ import (
 // Fingerprinting runs concurrently with a configurable worker pool to avoid blocking
 // port discovery. The onEvent callback must be concurrency-safe.
 func ScanTargetWithDiscoveryStream(
-	ipRange string,
+	ipRanges []string,
 	cfg discovery.DiscoveryConfig,
 	scanCfg fingerprint.FingerprintConfig,
 	onEvent func(types.Service),
 ) error {
 	ctx := context.Background()
 
-	if strings.TrimSpace(ipRange) == "" {
+	if len(ipRanges) == 0 {
 		return fmt.Errorf("target is empty")
 	}
 	if onEvent == nil {
@@ -87,7 +87,7 @@ func ScanTargetWithDiscoveryStream(
 	}
 
 	// Run discovery
-	err := naabu.Run(ctx, ipRange, discovery.DiscoveryConfig{
+	err := naabu.Run(ctx, ipRanges, discovery.DiscoveryConfig{
 		ScanType: cfg.ScanType,
 		Ports:    cfg.Ports,
 		TopPorts: cfg.TopPorts,

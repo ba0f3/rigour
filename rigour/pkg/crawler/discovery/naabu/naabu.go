@@ -3,23 +3,21 @@ package naabu
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/ctrlsam/rigour/pkg/crawler/discovery"
-	"github.com/projectdiscovery/goflags"
 	naabuResult "github.com/projectdiscovery/naabu/v2/pkg/result"
 	naabuRunner "github.com/projectdiscovery/naabu/v2/pkg/runner"
 )
 
-// Run executes Naabu discovery for a single input target and invokes onResult
+// Run executes Naabu discovery for multiple input targets and invokes onResult
 // for each open port found.
-func Run(ctx context.Context, ipRange string, opts discovery.DiscoveryConfig, onResult func(discovery.Result)) error {
-	if strings.TrimSpace(ipRange) == "" {
+func Run(ctx context.Context, ipRanges []string, opts discovery.DiscoveryConfig, onResult func(discovery.Result)) error {
+	if len(ipRanges) == 0 {
 		return fmt.Errorf("naabu discovery input is empty")
 	}
 
 	naabuOpts := &naabuRunner.Options{
-		Host: goflags.StringSlice{ipRange},
+		Host: ipRanges,
 		// caller-configurable
 		ScanType: opts.ScanType,
 		Ports:    opts.Ports,

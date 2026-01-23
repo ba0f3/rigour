@@ -41,17 +41,23 @@ type cliConfig struct {
 var (
 	config  cliConfig
 	rootCmd = &cobra.Command{
-		Use: "rigour [flags]\nTARGET SPECIFICATION:\n\tRequires an ip address or CIDR range\n" +
-			"EXAMPLES:\n\trigour 192.168.1.0/24\n",
+		Use: "rigour [flags] [target1] [target2] ...\nTARGET SPECIFICATION:\n\tRequires one or more ip addresses or CIDR ranges\n" +
+			"EXAMPLES:\n\trigour 192.168.1.0/24 10.0.0.1/32\n",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configErr := checkConfig(config)
 			if configErr != nil {
 				return configErr
 			}
 
-			cidrRange := args[0]
-			ipCount := getCIDRRangeSize(cidrRange)
-			fmt.Printf("Starting scan of %d IPs in range %s\n", ipCount, cidrRange)
+			targets := args
+			if len(targets) == 0 {
+				return fmt.Errorf("no targets specified")
+			}
+			ipCount := 0
+			for _, t := range targets {
+				ipCount += getCIDRRangeSize(t)
+			}
+			fmt.Printf("Starting scan of %d IPs across %d targets: %v\n", ipCount, len(targets), targets)
 
 			var producer messaging.Producer[types.Service]
 			if brokers := strings.TrimSpace(config.kafkaBrokers); brokers != "" {
@@ -88,7 +94,7 @@ var (
 				}
 			}
 
-			err := crawler.ScanTargetWithDiscoveryStream(cidrRange, createDiscoveryConfig(config), createScanConfig(config), onEvent)
+			err := crawler.ScanTargetWithDiscoveryStream(targets, createDiscoveryConfig(config), createScanConfig(config), onEvent)
 			if err != nil {
 				return fmt.Errorf("Failed running discovery+scan stream (%w)", err)
 			}
@@ -111,8 +117,15 @@ func checkConfig(config cliConfig) error {
 	return nil
 }
 
-func getCIDRRangeSize(cidr string) int {
-	_, ipnet, _ := net.ParseCIDR(cidr)
+func getCIDRRangeSize(target string) int {
+	_, ipnet, err := net.ParseCIDR(target)
+	if err != nil {
+		// Not a CIDR, check if it's a single IP
+		if ip := net.ParseIP(target); ip != nil {
+			return 1
+		}
+		return 0
+	}
 	ones, bits := ipnet.Mask.Size()
 	numIPs := 1 << (bits - ones)
 	return numIPs
