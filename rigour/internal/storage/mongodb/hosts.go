@@ -99,7 +99,7 @@ func (repo *HostRepository) GetByIP(ctx context.Context, ip string) (*types.Host
 	return &host, nil
 }
 
-func (repo *HostRepository) UpsertService(ctx context.Context, svc types.Service) error {
+func (repo *HostRepository) UpsertService(ctx context.Context, svc types.Service) (bool, error) {
 	now := svc.LastScan
 	if now.IsZero() {
 		now = time.Now()
@@ -123,10 +123,10 @@ func (repo *HostRepository) UpsertService(ctx context.Context, svc types.Service
 
 	res, err := repo.collection.UpdateOne(ctx, filter, updateExisting)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if res.MatchedCount > 0 {
-		return nil
+		return false, nil
 	}
 
 	// Not found, push it.
@@ -139,9 +139,9 @@ func (repo *HostRepository) UpsertService(ctx context.Context, svc types.Service
 	}
 	_, err = repo.collection.UpdateOne(ctx, filterHost, pushUpdate)
 	if err != nil {
-		return fmt.Errorf("mongodb: push service: %w", err)
+		return false, fmt.Errorf("mongodb: push service: %w", err)
 	}
-	return nil
+	return true, nil
 }
 
 func (repo *HostRepository) Search(ctx context.Context, filter map[string]interface{}, lastID string, limit int) ([]types.Host, string, error) {

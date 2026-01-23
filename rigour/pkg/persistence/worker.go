@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"time"
 
+	"strings"
+
 	"github.com/ctrlsam/rigour/internal/messaging/kafka"
 	"github.com/ctrlsam/rigour/internal/storage"
 	"github.com/ctrlsam/rigour/internal/storage/mongodb"
+	"github.com/ctrlsam/rigour/pkg/notifications/telegram"
 	"github.com/ctrlsam/rigour/pkg/types"
 )
 
@@ -150,5 +153,30 @@ func (app *App) handleService(ctx context.Context, svc types.Service) error {
 	}
 
 	// 4. Upsert service under the enriched host.
-	return app.repo.UpsertService(ctx, svc)
+	isNew, err := app.repo.UpsertService(ctx, svc)
+	if err != nil {
+		return err
+	}
+
+	// 5. Notify if new
+	if isNew && app.cfg.TelegramToken != "" && app.cfg.TelegramChatID != 0 {
+		bot := telegram.NewBot(app.cfg.TelegramToken, app.cfg.TelegramChatID)
+		msg := fmt.Sprintf("🚀 *New Service Discovered*\n\n*IP:* `%s`\n*Port:* `%d`\n*Protocol:* `%s`\n*TLS:* `%v`\n*Transport:* `%s` ",
+			svc.IP, svc.Port, svc.Protocol, svc.TLS, svc.Transport)
+
+		if svc.HTTP != nil {
+			msg += fmt.Sprintf("\n*Status:* `%s`", svc.HTTP.Status)
+		} else if svc.HTTPS != nil {
+			msg += fmt.Sprintf("\n*Status:* `%s`", svc.HTTPS.Status)
+		} else if svc.SSH != nil && svc.SSH.Banner != "" {
+			banner := strings.TrimSpace(svc.SSH.Banner)
+			if len(banner) > 100 {
+				banner = banner[:100] + "..."
+			}
+			msg += fmt.Sprintf("\n*Banner:* `%s`", banner)
+		}
+		_ = bot.Notify(msg)
+	}
+
+	return nil
 }

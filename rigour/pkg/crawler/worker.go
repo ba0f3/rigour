@@ -25,6 +25,7 @@ func ScanTargetWithDiscoveryStream(
 	cfg discovery.DiscoveryConfig,
 	scanCfg fingerprint.FingerprintConfig,
 	onEvent func(types.Service),
+	onDiscovery func(discovery.Result),
 ) error {
 	ctx := context.Background()
 
@@ -70,6 +71,9 @@ func ScanTargetWithDiscoveryStream(
 		}
 
 		fmt.Println("Discovered open port:", r.Host, r.Port)
+		if onDiscovery != nil {
+			onDiscovery(r)
+		}
 
 		// Non-blocking send to worker pool
 		select {

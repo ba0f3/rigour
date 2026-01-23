@@ -102,7 +102,9 @@ var (
 				}
 			}
 
-			err := crawler.ScanTargetWithDiscoveryStream(targets, createDiscoveryConfig(config), createScanConfig(config), onEvent)
+			onDiscovery := func(r discovery.Result) {}
+
+			err := crawler.ScanTargetWithDiscoveryStream(targets, createDiscoveryConfig(config), createScanConfig(config), onEvent, onDiscovery)
 			if err != nil {
 				return fmt.Errorf("Failed running discovery+scan stream (%w)", err)
 			}

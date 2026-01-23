@@ -43,8 +43,8 @@ type HostRepository interface {
 	EnsureHost(ctx context.Context, ip string, now time.Time) error
 
 	// UpsertService stores/updates a single service under its host.
-	// Implementations should create the host if it doesn't exist.
-	UpsertService(ctx context.Context, svc types.Service) error
+	// Returns true if the service was newly added, false if it existed.
+	UpsertService(ctx context.Context, svc types.Service) (bool, error)
 
 	// UpdateHost updates top-level host fields (ASN/Location/Labels/etc).
 	// Implementations may upsert.

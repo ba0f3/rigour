@@ -18,6 +18,9 @@ type Config struct {
 	DbTimeout    time.Duration
 
 	GeoIPDataDir string
+
+	TelegramToken  string
+	TelegramChatID int64
 }
 
 func (c Config) withDefaults() Config {

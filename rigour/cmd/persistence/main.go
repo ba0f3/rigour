@@ -14,13 +14,15 @@ import (
 )
 
 type cliConfig struct {
-	brokers       string
-	groupID       string
-	topic         string
-	dbURI         string
-	dbName        string
-	dbCollection  string
-	geoipDataPath string
+	brokers        string
+	groupID        string
+	topic          string
+	dbURI          string
+	dbName         string
+	dbCollection   string
+	geoipDataPath  string
+	telegramToken  string
+	telegramChatID int64
 }
 
 func main() {
@@ -31,14 +33,16 @@ func main() {
 		Short: "Consume crawler service events and persist/enrich hosts in MongoDB",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			appCfg := persistence.Config{
-				KafkaBrokers: cfg.brokers,
-				KafkaGroupID: cfg.groupID,
-				Topic:        cfg.topic,
-				DbURI:        cfg.dbURI,
-				DbName:       cfg.dbName,
-				DbCollection: cfg.dbCollection,
-				DbTimeout:    10 * time.Second,
-				GeoIPDataDir: cfg.geoipDataPath,
+				KafkaBrokers:   cfg.brokers,
+				KafkaGroupID:   cfg.groupID,
+				Topic:          cfg.topic,
+				DbURI:          cfg.dbURI,
+				DbName:         cfg.dbName,
+				DbCollection:   cfg.dbCollection,
+				DbTimeout:      10 * time.Second,
+				GeoIPDataDir:   cfg.geoipDataPath,
+				TelegramToken:  cfg.telegramToken,
+				TelegramChatID: cfg.telegramChatID,
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -75,6 +79,8 @@ func main() {
 	root.Flags().StringVar(&cfg.dbCollection, "mongo-coll", internalconst.HostsRepositoryName, "MongoDB hosts collection name")
 
 	root.Flags().StringVar(&cfg.geoipDataPath, "geoip-path", "", "Path to GeoIP data directory containing GeoLite2 database files")
+	root.Flags().StringVar(&cfg.telegramToken, "telegram-token", "", "Telegram Bot Token")
+	root.Flags().Int64Var(&cfg.telegramChatID, "telegram-chat-id", 0, "Telegram Chat ID")
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
