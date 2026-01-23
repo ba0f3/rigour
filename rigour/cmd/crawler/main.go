@@ -49,7 +49,15 @@ var (
 				return configErr
 			}
 
-			targets := args
+			var targets []string
+			for _, arg := range args {
+				// Split by comma or space
+				parts := strings.FieldsFunc(arg, func(r rune) bool {
+					return r == ',' || r == ' '
+				})
+				targets = append(targets, parts...)
+			}
+
 			if len(targets) == 0 {
 				return fmt.Errorf("no targets specified")
 			}
