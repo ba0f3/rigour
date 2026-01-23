@@ -36,13 +36,17 @@ type cliConfig struct {
 	topPorts string
 	retries  int
 	rate     int
+
+	// Targets
+	targetsFile string
+	cidrEnv     string
 }
 
 var (
 	config  cliConfig
 	rootCmd = &cobra.Command{
-		Use: "rigour [flags] [target1] [target2] ...\nTARGET SPECIFICATION:\n\tRequires one or more ip addresses or CIDR ranges\n" +
-			"EXAMPLES:\n\trigour 192.168.1.0/24 10.0.0.1/32\n",
+		Use: "rigour [flags] [target1] [target2] ...\nTARGET SPECIFICATION:\n\tRequires one or more ip addresses, CIDR ranges, or a targets file (-t)\n" +
+			"EXAMPLES:\n\trigour 192.168.1.0/24\n\trigour -t targets.txt\n\trigour 10.0.0.1 10.0.0.2\n",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configErr := checkConfig(config)
 			if configErr != nil {
@@ -50,9 +54,34 @@ var (
 			}
 
 			var targets []string
+
+			// 1. Check file first
+			if config.targetsFile != "" {
+				content, err := os.ReadFile(config.targetsFile)
+				if err != nil {
+					return fmt.Errorf("failed to read targets file: %w", err)
+				}
+				lines := strings.Split(string(content), "\n")
+				for _, line := range lines {
+					line = strings.TrimSpace(line)
+					if line == "" || strings.HasPrefix(line, "#") {
+						continue
+					}
+					targets = append(targets, line)
+				}
+			}
+
+			// 2. Add args
 			for _, arg := range args {
-				// Split by comma or space
 				parts := strings.FieldsFunc(arg, func(r rune) bool {
+					return r == ',' || r == ' '
+				})
+				targets = append(targets, parts...)
+			}
+
+			// 3. Check environment variable if still empty
+			if len(targets) == 0 && config.cidrEnv != "" {
+				parts := strings.FieldsFunc(config.cidrEnv, func(r rune) bool {
 					return r == ',' || r == ' '
 				})
 				targets = append(targets, parts...)
@@ -179,6 +208,10 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&config.topPorts, "top-ports", "1000", "top ports (e.g. 100, 1000, full)") // full
 	rootCmd.PersistentFlags().IntVar(&config.retries, "retries", 1, "discovery retries")
 	rootCmd.PersistentFlags().IntVar(&config.rate, "rate", 50_000, "discovery rate (packets per second)")
+
+	// Target selection
+	rootCmd.PersistentFlags().StringVarP(&config.targetsFile, "targets", "t", "", "path to file containing targets (one per line)")
+	config.cidrEnv = os.Getenv("CRAWLER_CIDR")
 }
 
 func main() {
