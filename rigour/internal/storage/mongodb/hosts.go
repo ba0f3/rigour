@@ -100,7 +100,7 @@ func (repo *HostRepository) GetByIP(ctx context.Context, ip string) (*types.Host
 	return &host, nil
 }
 
-func (repo *HostRepository) UpsertService(ctx context.Context, svc types.Service) (bool, error) {
+func (repo *HostRepository) UpsertService(ctx context.Context, svc types.Service) (storage.UpsertResult, error) {
 	svc.IP = strings.TrimSpace(svc.IP)
 	svc.Protocol = strings.ToLower(strings.TrimSpace(svc.Protocol))
 	svc.Transport = strings.ToLower(strings.TrimSpace(svc.Transport))
@@ -110,45 +110,76 @@ func (repo *HostRepository) UpsertService(ctx context.Context, svc types.Service
 		now = time.Now()
 	}
 
-	// Replace existing service or push if missing
-	filter := bson.M{
-		"ip": svc.IP,
-		"services": bson.M{
-			"$elemMatch": bson.M{
-				"port":      svc.Port,
-				"protocol":  svc.Protocol,
-				"transport": svc.Transport,
-			},
-		},
+	// Fetch the current host to check existing services
+	filter := bson.M{"ip": svc.IP}
+	var host types.Host
+	err := repo.collection.FindOne(ctx, filter).Decode(&host)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return storage.UpsertResultNone, fmt.Errorf("mongodb: host not found for service upsert: %s", svc.IP)
+		}
+		return storage.UpsertResultNone, err
 	}
-	updateExisting := bson.M{
+
+		// Check if the port already exists in any service
+	var existingSvc *types.Service
+	for i, s := range host.Services {
+		if s.Port == svc.Port {
+			existingSvc = &host.Services[i]
+			break
+		}
+	}
+
+	if existingSvc == nil {
+		// New port entirely
+		pushUpdate := bson.M{
+			"$set":  bson.M{"last_seen": now},
+			"$push": bson.M{"services": svc},
+		}
+		_, err = repo.collection.UpdateOne(ctx, filter, pushUpdate)
+		if err != nil {
+			return storage.UpsertResultNone, err
+		}
+		return storage.UpsertResultNewService, nil
+	}
+
+	// Port exists. Check if it's a significant update (protocol, transport, or status)
+	isSignificant := existingSvc.Protocol != svc.Protocol ||
+		existingSvc.Transport != svc.Transport ||
+		existingSvc.TLS != svc.TLS
+
+	// Check for status/banner change for specific protocols
+	if !isSignificant {
+		if svc.HTTP != nil && (existingSvc.HTTP == nil || existingSvc.HTTP.Status != svc.HTTP.Status) {
+			isSignificant = true
+		} else if svc.HTTPS != nil && (existingSvc.HTTPS == nil || existingSvc.HTTPS.Status != svc.HTTPS.Status) {
+			isSignificant = true
+		} else if svc.SSH != nil && (existingSvc.SSH == nil || existingSvc.SSH.Banner != svc.SSH.Banner) {
+			isSignificant = true
+		}
+	}
+
+	// Update the existing service entry
+	updateFilter := bson.M{
+		"ip":            svc.IP,
+		"services.port": svc.Port,
+	}
+	update := bson.M{
 		"$set": bson.M{
 			"services.$": svc,
 			"last_seen":  now,
 		},
 	}
-
-	res, err := repo.collection.UpdateOne(ctx, filter, updateExisting)
+	_, err = repo.collection.UpdateOne(ctx, updateFilter, update)
 	if err != nil {
-		return false, err
-	}
-	if res.MatchedCount > 0 {
-		return false, nil
+		return storage.UpsertResultNone, err
 	}
 
-	// Not found, push it.
-	filterHost := bson.M{"ip": svc.IP}
-	pushUpdate := bson.M{
-		"$set": bson.M{
-			"last_seen": now,
-		},
-		"$push": bson.M{"services": svc},
+	if isSignificant {
+		return storage.UpsertResultUpdatedService, nil
 	}
-	_, err = repo.collection.UpdateOne(ctx, filterHost, pushUpdate)
-	if err != nil {
-		return false, fmt.Errorf("mongodb: push service: %w", err)
-	}
-	return true, nil
+
+	return storage.UpsertResultNone, nil
 }
 
 func (repo *HostRepository) Search(ctx context.Context, filter map[string]interface{}, lastID string, limit int) ([]types.Host, string, error) {

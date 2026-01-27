@@ -153,29 +153,39 @@ func (app *App) handleService(ctx context.Context, svc types.Service) error {
 	}
 
 	// 4. Upsert service under the enriched host.
-	isNew, err := app.repo.UpsertService(ctx, svc)
+	result, err := app.repo.UpsertService(ctx, svc)
 	if err != nil {
 		return err
 	}
 
-	// 5. Notify if new
-	if isNew && app.cfg.TelegramToken != "" && app.cfg.TelegramChatID != 0 {
-		bot := telegram.NewBot(app.cfg.TelegramToken, app.cfg.TelegramChatID)
-		msg := fmt.Sprintf("🚀 *New Service Discovered*\n\n*IP:* `%s`\n*Port:* `%d`\n*Protocol:* `%s`\n*TLS:* `%v`\n*Transport:* `%s`",
-			svc.IP, svc.Port, svc.Protocol, svc.TLS, svc.Transport)
-
-		if svc.HTTP != nil {
-			msg += fmt.Sprintf("\n*Status:* `%s`", svc.HTTP.Status)
-		} else if svc.HTTPS != nil {
-			msg += fmt.Sprintf("\n*Status:* `%s`", svc.HTTPS.Status)
-		} else if svc.SSH != nil && svc.SSH.Banner != "" {
-			banner := strings.TrimSpace(svc.SSH.Banner)
-			if len(banner) > 100 {
-				banner = banner[:100] + "..."
-			}
-			msg += fmt.Sprintf("\n*Banner:* `%s`", banner)
+	// 5. Notify if new or significant update
+	if app.cfg.TelegramToken != "" && app.cfg.TelegramChatID != 0 {
+		var msg string
+		if result == storage.UpsertResultNewService {
+			msg = fmt.Sprintf("🚀 *New Service Discovered*\n\n*IP:* `%s`\n*Port:* `%d`\n*Protocol:* `%s`\n*TLS:* `%v`\n*Transport:* `%s`",
+				svc.IP, svc.Port, svc.Protocol, svc.TLS, svc.Transport)
+		} else if result == storage.UpsertResultUpdatedService {
+			// Optional: only notify if protocol changed or something significant?
+			// For now, let's just use a different title as requested.
+			msg = fmt.Sprintf("🔄 *Service Updated*\n\n*IP:* `%s`\n*Port:* `%d`\n*Protocol:* `%s`\n*TLS:* `%v`\n*Transport:* `%s`",
+				svc.IP, svc.Port, svc.Protocol, svc.TLS, svc.Transport)
 		}
-		_ = bot.Notify(msg)
+
+		if msg != "" {
+			bot := telegram.NewBot(app.cfg.TelegramToken, app.cfg.TelegramChatID)
+			if svc.HTTP != nil {
+				msg += fmt.Sprintf("\n*Status:* `%s`", svc.HTTP.Status)
+			} else if svc.HTTPS != nil {
+				msg += fmt.Sprintf("\n*Status:* `%s`", svc.HTTPS.Status)
+			} else if svc.SSH != nil && svc.SSH.Banner != "" {
+				banner := strings.TrimSpace(svc.SSH.Banner)
+				if len(banner) > 100 {
+					banner = banner[:100] + "..."
+				}
+				msg += fmt.Sprintf("\n*Banner:* `%s`", banner)
+			}
+			_ = bot.Notify(msg)
+		}
 	}
 
 	return nil

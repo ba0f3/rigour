@@ -36,6 +36,16 @@ type FacetCounts struct {
 	ASNs      []ASNFacet     `json:"asns,omitempty"`
 }
 
+// UpsertResult represents the result of an upsert operation.
+type UpsertResult int
+
+const (
+	UpsertResultNone UpsertResult = iota
+	UpsertResultNewHost
+	UpsertResultNewService
+	UpsertResultUpdatedService
+)
+
 // HostRepository is the interface for storing and querying host records.
 type HostRepository interface {
 	// EnsureHost ensures a host record exists for ip.
@@ -43,8 +53,8 @@ type HostRepository interface {
 	EnsureHost(ctx context.Context, ip string, now time.Time) error
 
 	// UpsertService stores/updates a single service under its host.
-	// Returns true if the service was newly added, false if it existed.
-	UpsertService(ctx context.Context, svc types.Service) (bool, error)
+	// Returns result of the operation and error.
+	UpsertService(ctx context.Context, svc types.Service) (UpsertResult, error)
 
 	// UpdateHost updates top-level host fields (ASN/Location/Labels/etc).
 	// Implementations may upsert.
