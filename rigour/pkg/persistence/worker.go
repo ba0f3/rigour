@@ -161,7 +161,7 @@ func (app *App) handleService(ctx context.Context, svc types.Service) error {
 	// 5. Notify if new
 	if isNew && app.cfg.TelegramToken != "" && app.cfg.TelegramChatID != 0 {
 		bot := telegram.NewBot(app.cfg.TelegramToken, app.cfg.TelegramChatID)
-		msg := fmt.Sprintf("🚀 *New Service Discovered*\n\n*IP:* `%s`\n*Port:* `%d`\n*Protocol:* `%s`\n*TLS:* `%v`\n*Transport:* `%s` ",
+		msg := fmt.Sprintf("🚀 *New Service Discovered*\n\n*IP:* `%s`\n*Port:* `%d`\n*Protocol:* `%s`\n*TLS:* `%v`\n*Transport:* `%s`",
 			svc.IP, svc.Port, svc.Protocol, svc.TLS, svc.Transport)
 
 		if svc.HTTP != nil {

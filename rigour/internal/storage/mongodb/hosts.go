@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ctrlsam/rigour/internal/storage"
@@ -100,6 +101,10 @@ func (repo *HostRepository) GetByIP(ctx context.Context, ip string) (*types.Host
 }
 
 func (repo *HostRepository) UpsertService(ctx context.Context, svc types.Service) (bool, error) {
+	svc.IP = strings.TrimSpace(svc.IP)
+	svc.Protocol = strings.ToLower(strings.TrimSpace(svc.Protocol))
+	svc.Transport = strings.ToLower(strings.TrimSpace(svc.Transport))
+
 	now := svc.LastScan
 	if now.IsZero() {
 		now = time.Now()
@@ -110,7 +115,9 @@ func (repo *HostRepository) UpsertService(ctx context.Context, svc types.Service
 		"ip": svc.IP,
 		"services": bson.M{
 			"$elemMatch": bson.M{
-				"port": svc.Port,
+				"port":      svc.Port,
+				"protocol":  svc.Protocol,
+				"transport": svc.Transport,
 			},
 		},
 	}
