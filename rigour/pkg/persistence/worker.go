@@ -165,10 +165,9 @@ func (app *App) handleService(ctx context.Context, svc types.Service) error {
 			msg = fmt.Sprintf("🚀 *New Service Discovered*\n\n*IP:* `%s`\n*Port:* `%d`\n*Protocol:* `%s`\n*TLS:* `%v`\n*Transport:* `%s`",
 				svc.IP, svc.Port, svc.Protocol, svc.TLS, svc.Transport)
 		} else if result == storage.UpsertResultUpdatedService {
-			// Optional: only notify if protocol changed or something significant?
-			// For now, let's just use a different title as requested.
-			msg = fmt.Sprintf("🔄 *Service Updated*\n\n*IP:* `%s`\n*Port:* `%d`\n*Protocol:* `%s`\n*TLS:* `%v`\n*Transport:* `%s`",
-				svc.IP, svc.Port, svc.Protocol, svc.TLS, svc.Transport)
+			// Do not notify for updated services to reduce noise
+			// msg = fmt.Sprintf("🔄 *Service Updated*\n\n*IP:* `%s`\n*Port:* `%d`\n*Protocol:* `%s`\n*TLS:* `%v`\n*Transport:* `%s`",
+			// 	svc.IP, svc.Port, svc.Protocol, svc.TLS, svc.Transport)
 		}
 
 		if msg != "" {
