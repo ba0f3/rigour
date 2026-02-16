@@ -100,7 +100,7 @@ func (repo *HostRepository) GetByIP(ctx context.Context, ip string) (*types.Host
 	return &host, nil
 }
 
-func (repo *HostRepository) UpsertService(ctx context.Context, svc types.Service) (storage.UpsertResult, error) {
+func (repo *HostRepository) UpsertService(ctx context.Context, svc types.Service) (storage.UpsertResult, []string, error) {
 	svc.IP = strings.TrimSpace(svc.IP)
 	svc.Protocol = strings.ToLower(strings.TrimSpace(svc.Protocol))
 	svc.Transport = strings.ToLower(strings.TrimSpace(svc.Transport))
@@ -116,12 +116,12 @@ func (repo *HostRepository) UpsertService(ctx context.Context, svc types.Service
 	err := repo.collection.FindOne(ctx, filter).Decode(&host)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return storage.UpsertResultNone, fmt.Errorf("mongodb: host not found for service upsert: %s", svc.IP)
+			return storage.UpsertResultNone, nil, fmt.Errorf("mongodb: host not found for service upsert: %s", svc.IP)
 		}
-		return storage.UpsertResultNone, err
+		return storage.UpsertResultNone, nil, err
 	}
 
-		// Check if the port already exists in any service
+	// Check if the port already exists in any service
 	var existingSvc *types.Service
 	for i, s := range host.Services {
 		if s.Port == svc.Port {
@@ -138,25 +138,50 @@ func (repo *HostRepository) UpsertService(ctx context.Context, svc types.Service
 		}
 		_, err = repo.collection.UpdateOne(ctx, filter, pushUpdate)
 		if err != nil {
-			return storage.UpsertResultNone, err
+			return storage.UpsertResultNone, nil, err
 		}
-		return storage.UpsertResultNewService, nil
+		return storage.UpsertResultNewService, nil, nil
 	}
 
-	// Port exists. Check if it's a significant update (protocol, transport, or status)
-	isSignificant := existingSvc.Protocol != svc.Protocol ||
-		existingSvc.Transport != svc.Transport ||
-		existingSvc.TLS != svc.TLS
+	// Port exists. Check if it's a significant update
+	var changes []string
+
+	if existingSvc.Protocol != svc.Protocol {
+		changes = append(changes, fmt.Sprintf("Protocol: %s -> %s", existingSvc.Protocol, svc.Protocol))
+	}
+	if existingSvc.Transport != svc.Transport {
+		changes = append(changes, fmt.Sprintf("Transport: %s -> %s", existingSvc.Transport, svc.Transport))
+	}
+	if existingSvc.TLS != svc.TLS {
+		changes = append(changes, fmt.Sprintf("TLS: %v -> %v", existingSvc.TLS, svc.TLS))
+	}
 
 	// Check for status/banner change for specific protocols
-	if !isSignificant {
-		if svc.HTTP != nil && (existingSvc.HTTP == nil || existingSvc.HTTP.Status != svc.HTTP.Status) {
-			isSignificant = true
-		} else if svc.HTTPS != nil && (existingSvc.HTTPS == nil || existingSvc.HTTPS.Status != svc.HTTPS.Status) {
-			isSignificant = true
-		} else if svc.SSH != nil && (existingSvc.SSH == nil || existingSvc.SSH.Banner != svc.SSH.Banner) {
-			isSignificant = true
+	if svc.HTTP != nil && (existingSvc.HTTP == nil || existingSvc.HTTP.Status != svc.HTTP.Status) {
+		statusBefore := "N/A"
+		if existingSvc.HTTP != nil {
+			statusBefore = existingSvc.HTTP.Status
 		}
+		changes = append(changes, fmt.Sprintf("HTTP Status: %s -> %s", statusBefore, svc.HTTP.Status))
+	} else if svc.HTTPS != nil && (existingSvc.HTTPS == nil || existingSvc.HTTPS.Status != svc.HTTPS.Status) {
+		statusBefore := "N/A"
+		if existingSvc.HTTPS != nil {
+			statusBefore = existingSvc.HTTPS.Status
+		}
+		changes = append(changes, fmt.Sprintf("HTTPS Status: %s -> %s", statusBefore, svc.HTTPS.Status))
+	} else if svc.SSH != nil && (existingSvc.SSH == nil || existingSvc.SSH.Banner != svc.SSH.Banner) {
+		bannerBefore := "N/A"
+		if existingSvc.SSH != nil {
+			bannerBefore = strings.TrimSpace(existingSvc.SSH.Banner)
+			if len(bannerBefore) > 50 {
+				bannerBefore = bannerBefore[:50] + "..."
+			}
+		}
+		bannerAfter := strings.TrimSpace(svc.SSH.Banner)
+		if len(bannerAfter) > 50 {
+			bannerAfter = bannerAfter[:50] + "..."
+		}
+		changes = append(changes, fmt.Sprintf("SSH Banner: '%s' -> '%s'", bannerBefore, bannerAfter))
 	}
 
 	// Update the existing service entry
@@ -172,14 +197,14 @@ func (repo *HostRepository) UpsertService(ctx context.Context, svc types.Service
 	}
 	_, err = repo.collection.UpdateOne(ctx, updateFilter, update)
 	if err != nil {
-		return storage.UpsertResultNone, err
+		return storage.UpsertResultNone, nil, err
 	}
 
-	if isSignificant {
-		return storage.UpsertResultUpdatedService, nil
+	if len(changes) > 0 {
+		return storage.UpsertResultUpdatedService, changes, nil
 	}
 
-	return storage.UpsertResultNone, nil
+	return storage.UpsertResultNone, nil, nil
 }
 
 func (repo *HostRepository) Search(ctx context.Context, filter map[string]interface{}, lastID string, limit int) ([]types.Host, string, error) {

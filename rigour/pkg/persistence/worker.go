@@ -153,7 +153,7 @@ func (app *App) handleService(ctx context.Context, svc types.Service) error {
 	}
 
 	// 4. Upsert service under the enriched host.
-	result, err := app.repo.UpsertService(ctx, svc)
+	result, changes, err := app.repo.UpsertService(ctx, svc)
 	if err != nil {
 		return err
 	}
@@ -164,10 +164,11 @@ func (app *App) handleService(ctx context.Context, svc types.Service) error {
 		if result == storage.UpsertResultNewService {
 			msg = fmt.Sprintf("🚀 *New Service Discovered*\n\n*IP:* `%s`\n*Port:* `%d`\n*Protocol:* `%s`\n*TLS:* `%v`\n*Transport:* `%s`",
 				svc.IP, svc.Port, svc.Protocol, svc.TLS, svc.Transport)
-		} else if result == storage.UpsertResultUpdatedService {
-			// Do not notify for updated services to reduce noise
-			// msg = fmt.Sprintf("🔄 *Service Updated*\n\n*IP:* `%s`\n*Port:* `%d`\n*Protocol:* `%s`\n*TLS:* `%v`\n*Transport:* `%s`",
-			// 	svc.IP, svc.Port, svc.Protocol, svc.TLS, svc.Transport)
+		} else if result == storage.UpsertResultUpdatedService && len(changes) > 0 {
+			msg = fmt.Sprintf("🔄 *Service Updated*\n\n*IP:* `%s`\n*Port:* `%d`", svc.IP, svc.Port)
+			for _, change := range changes {
+				msg += fmt.Sprintf("\n- %s", change)
+			}
 		}
 
 		if msg != "" {

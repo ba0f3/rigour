@@ -53,8 +53,8 @@ type HostRepository interface {
 	EnsureHost(ctx context.Context, ip string, now time.Time) error
 
 	// UpsertService stores/updates a single service under its host.
-	// Returns result of the operation and error.
-	UpsertService(ctx context.Context, svc types.Service) (UpsertResult, error)
+	// Returns result of the operation, a list of changes, and error.
+	UpsertService(ctx context.Context, svc types.Service) (UpsertResult, []string, error)
 
 	// UpdateHost updates top-level host fields (ASN/Location/Labels/etc).
 	// Implementations may upsert.
