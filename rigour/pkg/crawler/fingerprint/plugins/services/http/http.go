@@ -97,8 +97,11 @@ func (p *HTTPPlugin) Run(conn net.Conn, timeout time.Duration, target plugins.Ta
 	}
 	defer resp.Body.Close()
 
-	technologies, cpes, _ := p.FingerprintResponse(resp)
+	if resp.StatusCode == http.StatusBadRequest {
+		return nil, &utils.InvalidResponseError{Service: HTTP}
+	}
 
+	technologies, cpes, _ := p.FingerprintResponse(resp)
 	payload := plugins.ServiceHTTP{
 		Status:          resp.Status,
 		StatusCode:      resp.StatusCode,
@@ -156,8 +159,12 @@ func (p *HTTPSPlugin) Run(
 	}
 	defer resp.Body.Close()
 
-	technologies, cpes, _ := p.FingerprintResponse(resp)
+	// If we get a 400 Bad Request on HTTPS, it might be an HTTP service on an HTTPS port
+	if resp.StatusCode == http.StatusBadRequest {
+		return nil, &utils.InvalidResponseError{Service: HTTPS}
+	}
 
+	technologies, cpes, _ := p.FingerprintResponse(resp)
 	payload := plugins.ServiceHTTPS{
 		Status:          resp.Status,
 		StatusCode:      resp.StatusCode,
